@@ -10,13 +10,15 @@
 #
 # I would like to use the API to monitor listings in the GTA to try to get a feeling of the overall
 # state of the housing market in the area.
+#
+# Modified for csv output for data collection for school project
 
 package require http
 package require tls
 package require json
 
 namespace eval realtor_api {
-	variable _api_address "https://api2.realtor.ca/Listing.svc/PropertySearch_Post"
+	variable _api_address "https://api37.realtor.ca/Listing.svc/PropertySearch_Post"
 	
 	proc main {} {
 		http::register https 443 [list ::tls::socket -tls1 1]
@@ -25,18 +27,19 @@ namespace eval realtor_api {
 	
 	proc test_api {} {
 		# Can only request for one page of listings at a time
+		set fp [open "input.txt" w+]
 		set CurrentPage 1
 		while {1} {
 			set Query [::http::formatQuery \
 				CultureId 1 \
 				ApplicationId 1 \
 				PropertySearchTypeId 1 \
-				LongitudeMin -79.499225 \
-				LongitudeMax -79.412987 \
-				LatitudeMin 43.957584 \
-				LatitudeMax 44.016609 \
-				PriceMin 0 \
-				PriceMax 100000000 \
+				LongitudeMin -115.17457 \
+				LongitudeMax -112.99927 \
+				LatitudeMin 50.69620 \
+				LatitudeMax 51.35781 \
+				PriceMin 400000 \
+				PriceMax 450000 \
 				BuildingTypeId 1 \
 				ConstructionStyleId 3 \
 				CurrentPage $CurrentPage \
@@ -46,52 +49,38 @@ namespace eval realtor_api {
 				break
 			}
 			set ResultDict [json::json2dict $Result]
-			
+			#puts $fp $ResultDict
+			#puts $fp [::dict keys $ResultDict]
 			set CurrentPage [::dict get $ResultDict "Paging" "CurrentPage"]
 			set TotalPages [::dict get $ResultDict "Paging" "TotalPages"]
 			
-			puts "---------------------------------------"
-			puts "Result retrieved for page: $CurrentPage"
-			puts "---------------------------------------"
+			# puts $fp "---------------------------------------"
+			# puts $fp "Result retrieved for page: $CurrentPage"
+			# puts $fp "---------------------------------------"
 			
 			set Listings [::dict get $ResultDict "Results"]
+			#puts $fp $Listings
+			#puts $fp [::dict keys $Listings]
 			foreach Listing $Listings {
-				set Bathrooms [::dict get $Listing "Building" "BathroomTotal"]
-				set Bedrooms [::dict get $Listing "Building" "Bedrooms"]
-				if {[llength [split $Bedrooms "+"]] > 1} {
-					set ExtraBR [string trim [lindex [split $Bedrooms "+"] 1]]
-				}
-				
-				# Trying to determine lot size (acres) by parsing the various notes, mainly separated by ";" 
-				set Size ""
-				if {[::dict exists $Listing "Land" "SizeTotal"]} {
-					set LandSize [::dict get $Listing "Land" "SizeTotal"]
-					foreach Note [split $LandSize ";"] {
-						if {[llength [split $Note "|"]] > 1} {
-							set Note [string trim [lindex [split $Note "|"] 0]]
-						}
-						if {[string first "x" $Note] >= 0} {
-							set Divider ""
-							switch -glob -- $Note {
-								"*FT*" {set Divider 43560}
-								"*M*" {set Divider 4046}
-								"*Acre*" {set Divider 1}
-							}
-							set Mapped [string trim [string map {"x" "" "M" "" "FT" "" "Acre" ""} $Note]]
-							if {[llength $Mapped] == 2 && $Divider ne ""} {
-								set Size [format %.2f [expr {double([lindex $Mapped 0]) * [lindex $Mapped 1] / $Divider}]]
-								break
-							}
-						} else {
-							if {[string first "Ac" $Note] >= 0} {
-								set Size [string trim [string map {"Acres" "" "Acre" "" "Ac" ""} $Note]]
-								break
-							}
-						}
-					}
-				}
+			
+				#puts $fp $Listing
+				#puts $fp [::dict keys $Listing]
+				set Id [::dict get $Listing "Id"]
+				set MlsNumber [::dict get $Listing "MlsNumber"]
 				set Price [::dict get $Listing "Property" "Price"]
-				puts "Bedrooms=$Bedrooms, Bathrooms=$Bathrooms, Price=$Price, Size=$Size"
+				#set Bedrooms [::dict get $Listing "Building" "Bedrooms"]
+				#if {[llength [split $Bedrooms "+"]] > 1} {
+				#	set ExtraBR [string trim [lindex [split $Bedrooms "+"] 1]]
+				#}
+				#set Bathrooms [::dict get $Listing "Building" "BathroomTotal"]
+				set PostalCode [::dict get $Listing "PostalCode"]
+				set StatusId [::dict get $Listing "StatusId"]
+				set URL [::dict get $Listing "RelativeURLEn"]
+				
+				
+				#puts $fp "Bedrooms=$Bedrooms, Bathrooms=$Bathrooms, Price=$Price, Size=$Size, ID=$ID, MlsNumber=$MlsNumber"
+				#  ID, MlsNumber, postalcode, Price, StausID, RelativeURLEn 
+				puts $fp "$Id, $MlsNumber, $Price, $PostalCode, $StatusId, $URL"
 			}
 			if {$CurrentPage == $TotalPages} {
 				break
@@ -103,26 +92,26 @@ namespace eval realtor_api {
 	#Nice and simple request. No cookies, API keys, or authorization. Not even SNI.
 	proc realtor_request {Query} {
 		variable _api_address
-		
-		# puts "realtor_request...sending request to: $URL"
+		set fpe [open "errors.txt" w+]
+		# puts $fp "realtor_request...sending request to: $URL"
 		if {[catch {
 			set Token [::http::geturl $_api_address \
 				-timeout 10000 \
 				-query $Query \
 			]
 		} error]} {
-			puts "realtor_request...Something went wrong: $error"
+			puts $fpe "realtor_request...Something went wrong: $error"
 			return "";
 		}
 		
 		if {[http::status $Token] eq "timeout"} {
-			puts "realtor_request...timeout"
+			puts $fpe "realtor_request...timeout"
 			http::cleanup $Token
 		}
 		if {[http::ncode $Token] ne 200} {
-			# For debugging. Outputs contents of HTTP header
+			# For debugging. Outputs $fp contents of HTTP header
 			foreach {Name Value} [http::meta $Token] {
-				puts "realtor_request...Code not 200, $Name=$Value"
+				puts $fpe "realtor_request...Code not 200, $Name=$Value"
 			}
 			return ""
 		}
@@ -134,5 +123,4 @@ namespace eval realtor_api {
 }
 
 realtor_api::main
-
 
