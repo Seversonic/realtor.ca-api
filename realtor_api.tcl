@@ -11,7 +11,8 @@
 # I would like to use the API to monitor listings in the GTA to try to get a feeling of the overall
 # state of the housing market in the area.
 #
-# Modified for csv output for data collection for school project
+# Modified for csv output for data collection for school project by Ryan S
+
 
 package require http
 package require tls
@@ -25,6 +26,26 @@ namespace eval realtor_api {
 		test_api
 	}
 	
+	# YYC 
+	# LongitudeMin -115.17457 \
+	# LongitudeMax -112.99927 \
+	# LatitudeMin 50.69620 \
+	# LatitudeMax 51.35781 \
+	
+	# YWG 
+	# LongitudeMin -97.69638 \
+	# LongitudeMax -96.60874 \
+	# LatitudeMin 49.68410 \
+	# LatitudeMax 50.02322 \	
+
+	# YEG 
+	# LongitudeMin -114.58014 \
+	# LongitudeMax -112.40484 \
+	# LatitudeMin 53.24254 \
+	# LatitudeMax 53.86743 \	
+	
+	
+	
 	proc test_api {} {
 		# Can only request for one page of listings at a time
 		set fp [open "input.txt" w+]
@@ -34,10 +55,10 @@ namespace eval realtor_api {
 				CultureId 1 \
 				ApplicationId 1 \
 				PropertySearchTypeId 1 \
-				LongitudeMin -115.17457 \
-				LongitudeMax -112.99927 \
-				LatitudeMin 50.69620 \
-				LatitudeMax 51.35781 \
+				LongitudeMin -114.58014 \
+				LongitudeMax -112.40484 \
+				LatitudeMin 53.24254 \
+				LatitudeMax 53.86743 \
 				PriceMin 400000 \
 				PriceMax 450000 \
 				BuildingTypeId 1 \
@@ -68,19 +89,21 @@ namespace eval realtor_api {
 				set Id [::dict get $Listing "Id"]
 				set MlsNumber [::dict get $Listing "MlsNumber"]
 				set Price [::dict get $Listing "Property" "Price"]
-				#set Bedrooms [::dict get $Listing "Building" "Bedrooms"]
-				#if {[llength [split $Bedrooms "+"]] > 1} {
-				#	set ExtraBR [string trim [lindex [split $Bedrooms "+"] 1]]
-				#}
+				set Bedrooms [::dict get $Listing "Building" "Bedrooms"]
 				#set Bathrooms [::dict get $Listing "Building" "BathroomTotal"]
+				set SizeInterior [::dict get $Listing "Building" "SizeInterior"]
 				set PostalCode [::dict get $Listing "PostalCode"]
 				set StatusId [::dict get $Listing "StatusId"]
 				set URL [::dict get $Listing "RelativeURLEn"]
+				set Building [::dict get $Listing "Building"]
+				# puts $fp $MlsNumber
+				# puts $fp $Price
+				# puts $fp $Building
 				
 				
 				#puts $fp "Bedrooms=$Bedrooms, Bathrooms=$Bathrooms, Price=$Price, Size=$Size, ID=$ID, MlsNumber=$MlsNumber"
 				#  ID, MlsNumber, postalcode, Price, StausID, RelativeURLEn 
-				puts $fp "$Id, $MlsNumber, $Price, $PostalCode, $StatusId, $URL"
+				puts $fp "$Id, $MlsNumber, $Price, $SizeInterior, $Bedrooms, $PostalCode, $StatusId, $URL"
 			}
 			if {$CurrentPage == $TotalPages} {
 				break
@@ -123,4 +146,3 @@ namespace eval realtor_api {
 }
 
 realtor_api::main
-
